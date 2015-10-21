@@ -27,6 +27,7 @@ import cascading.tap.{ Tap, SinkTap }
 import cascading.tuple.{ Fields, Tuple => CTuple, TupleEntry, TupleEntryCollector }
 
 import cascading.pipe.Pipe
+import org.apache.hadoop.conf.Configuration
 
 import org.apache.hadoop.mapred.JobConf
 import org.apache.hadoop.mapred.OutputCollector
@@ -52,13 +53,13 @@ case object Write extends AccessMode
 
 object HadoopSchemeInstance {
   def apply(scheme: Scheme[_, _, _, _, _]) =
-    scheme.asInstanceOf[Scheme[JobConf, RecordReader[_, _], OutputCollector[_, _], _, _]]
+    scheme.asInstanceOf[Scheme[Configuration, RecordReader[_, _], OutputCollector[_, _], _, _]]
 }
 
 object CastHfsTap {
   // The scala compiler has problems with the generics in Cascading
-  def apply(tap: Hfs): Tap[JobConf, RecordReader[_, _], OutputCollector[_, _]] =
-    tap.asInstanceOf[Tap[JobConf, RecordReader[_, _], OutputCollector[_, _]]]
+  def apply(tap: Hfs): Tap[Configuration, RecordReader[_, _], OutputCollector[_, _]] =
+    tap.asInstanceOf[Tap[Configuration, RecordReader[_, _], OutputCollector[_, _]]]
 }
 
 /**
@@ -209,7 +210,8 @@ class NullTap[Config, Input, Output, SourceContext, SinkContext]
     SinkMode.UPDATE) {
 
   def getIdentifier = "nullTap"
-  def openForWrite(flowProcess: FlowProcess[Config], output: Output) =
+
+  def openForWrite(flowProcess: FlowProcess[_ <: Config], output: Output) =
     new TupleEntryCollector {
       override def add(te: TupleEntry) {}
       override def add(t: CTuple) {}
