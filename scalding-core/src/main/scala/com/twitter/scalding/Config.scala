@@ -420,7 +420,7 @@ object Config {
     empty
       .setListSpillThreshold(100 * 1000)
       .setMapSpillThreshold(100 * 1000)
-      .setMapSideAggregationThreshold(100 * 1000)
+      .setMapSideAggregationCapacity(100 * 1000)
       .setSerialization(Right(classOf[serialization.KryoHadoop]))
       .setScaldingVersion
       .setHRavenHistoryUserName
@@ -514,7 +514,7 @@ object Config {
     (empty
       .setListSpillThreshold(100 * 1000)
       .setMapSpillThreshold(100 * 1000)
-      .setMapSideAggregationThreshold(100 * 1000) ++ fromHadoop(conf))
+      .setMapSideAggregationCapacity(100 * 1000) ++ fromHadoop(conf))
       .setSerialization(Right(classOf[serialization.KryoHadoop]))
       .setScaldingVersion
   /*
