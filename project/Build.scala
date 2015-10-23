@@ -24,10 +24,10 @@ object ScaldingBuild extends Build {
   val algebirdVersion = "0.11.0"
   val avroVersion = "1.7.4"
   val bijectionVersion = "0.8.1"
-  val cascadingAvroVersion = "2.1.2"
+  val cascadingAvroVersion = "3.0-SNAPSHOT" // https://github.com/ScaleUnlimited/cascading.avro/pull/44
   val chillVersion = "0.7.1"
-  val dfsDatastoresVersion = "1.3.4"
-  val elephantbirdVersion = "4.8"
+  val dfsDatastoresVersion = "1.3.7"
+  val elephantbirdVersion = "4.11-SNAPSHOT"
   val hadoopLzoVersion = "0.4.19"
   val hadoopVersion = "2.5.0"
   val hbaseVersion = "0.94.10"
@@ -319,14 +319,15 @@ object ScaldingBuild extends Build {
 
   lazy val scaldingCommons = module("commons").settings(
     libraryDependencies ++= Seq(
-      "com.backtype" % "dfs-datastores-cascading" % dfsDatastoresVersion,
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided",
+      "com.backtype" % "dfs-datastores-cascading3" % dfsDatastoresVersion, // FIXME: https://github.com/nathanmarz/dfs-datastores/pull/53
       "com.backtype" % "dfs-datastores" % dfsDatastoresVersion,
       // TODO: split into scalding-protobuf
       "com.google.protobuf" % "protobuf-java" % protobufVersion,
       "com.twitter" %% "bijection-core" % bijectionVersion,
       "com.twitter" %% "algebird-core" % algebirdVersion,
       "com.twitter" %% "chill" % chillVersion,
-      "com.twitter.elephantbird" % "elephant-bird-cascading2" % elephantbirdVersion,
+      "com.twitter.elephantbird" % "elephant-bird-cascading3" % elephantbirdVersion,
       "com.twitter.elephantbird" % "elephant-bird-core" % elephantbirdVersion,
       "com.hadoop.gplcompression" % "hadoop-lzo" % hadoopLzoVersion,
       // TODO: split this out into scalding-thrift
@@ -350,7 +351,7 @@ object ScaldingBuild extends Build {
   lazy val scaldingParquet = module("parquet").settings(
     libraryDependencies <++= (scalaVersion) { scalaVersion => Seq(
       // see https://issues.apache.org/jira/browse/PARQUET-143 for exclusions
-      "org.apache.parquet" % "parquet-cascading" % parquetVersion
+      "org.apache.parquet" % "parquet-cascading3" % parquetVersion // FIXME: https://github.com/apache/parquet-mr/pull/284
         exclude("org.apache.parquet", "parquet-pig")
         exclude("com.twitter.elephantbird", "elephant-bird-pig")
         exclude("com.twitter.elephantbird", "elephant-bird-core"),
