@@ -325,8 +325,8 @@ object ScaldingBuild extends Build {
   lazy val scaldingCommons = module("commons").settings(
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided",
-      "com.cchepelov.com.backtype" % "dfs-datastores-cascading3" % dfsDatastoresVersion, // FIXME: https://github.com/nathanmarz/dfs-datastores/pull/53
-      "com.cchepelov.com.backtype" % "dfs-datastores" % dfsDatastoresVersion,
+      "temp.cchepelov.com.backtype" % "dfs-datastores-cascading3" % dfsDatastoresVersion, // FIXME: https://github.com/nathanmarz/dfs-datastores/pull/53
+      "temp.cchepelov.com.backtype" % "dfs-datastores" % dfsDatastoresVersion,
       // TODO: split into scalding-protobuf
       "com.google.protobuf" % "protobuf-java" % protobufVersion,
       "com.twitter" %% "bijection-core" % bijectionVersion,
