@@ -11,6 +11,7 @@ addons:
   apt:
     packages:
     - md5deep
+    -
 matrix:
   include:
 #BASE TESTS
@@ -23,8 +24,8 @@ matrix:
       script: "scripts/run_test.sh"
 
     - scala: 2.10.5
-      env: BUILD="base" TEST_TARGET="scalding-avro scalding-hraven scalding-commons scalding-parquet scalding-parquet-scrooge" TRAVIS_WAIT=travis_wait
-      script: "scripts/run_test.sh"
+      env: BUILD="base" TEST_TARGET="scalding-avro scalding-hraven scalding-commons scalding-parquet scalding-parquet-scrooge"
+      script: travis_wait "scripts/run_test.sh"
 
     - scala: 2.11.7
       env: BUILD="base" TEST_TARGET="scalding-avro scalding-hraven scalding-commons scalding-parquet scalding-parquet-scrooge" TRAVIS_WAIT=travis_wait
