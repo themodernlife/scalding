@@ -24,10 +24,10 @@ object ScaldingBuild extends Build {
   val algebirdVersion = "0.11.0"
   val avroVersion = "1.7.4"
   val bijectionVersion = "0.8.1"
-  val cascadingAvroVersion = "2.1.2"
+  val cascadingAvroVersion = "3.0-SNAPSHOT"    // https://github.com/ScaleUnlimited/cascading.avro/pull/44
   val chillVersion = "0.7.1"
-  val dfsDatastoresVersion = "1.3.4"
-  val elephantbirdVersion = "4.8"
+  val dfsDatastoresVersion = "1.3.8-SNAPSHOT"  // https://github.com/nathanmarz/dfs-datastores/pull/53
+  val elephantbirdVersion = "4.11-SNAPSHOT"    // https://github.com/twitter/elephant-bird/pull/454
   val hadoopLzoVersion = "0.4.19"
   val hadoopVersion = "2.5.0"
   val hbaseVersion = "0.94.10"
@@ -35,7 +35,7 @@ object ScaldingBuild extends Build {
   val jacksonVersion = "2.4.2"
   val json4SVersion = "3.2.11"
   val paradiseVersion = "2.0.1"
-  val parquetVersion = "1.8.1"
+  val parquetVersion = "1.8.2-SNAPSHOT"        // https://github.com/apache/parquet-mr/pull/284
   val protobufVersion = "2.4.1"
   val quasiquotesVersion = "2.0.1"
   val scalaCheckVersion = "1.12.2"
@@ -45,6 +45,9 @@ object ScaldingBuild extends Build {
   val slf4jVersion = "1.6.6"
   val thriftVersion = "0.5.0"
   val junitVersion = "4.10"
+  
+  /* NOTE: the temp.cchepelov.* groupIds are to let the scalding build machine access the patched upstream dependencies until they get merged. 
+    This *must* be removed before proceeding. */
 
   val printDependencyClasspath = taskKey[Unit]("Prints location of the dependencies")
 
@@ -76,7 +79,9 @@ object ScaldingBuild extends Build {
       "Concurrent Maven Repo" at "http://conjars.org/repo",
       "Clojars Repository" at "http://clojars.org/repo",
       "Twitter Maven" at "http://maven.twttr.com",
-      "Cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
+      "Cloudera" at "https://repository.cloudera.com/artifactory/cloudera-repos/",
+
+      "Conjars Repository" at "http://conjars.org/repo"   /* TEMPORARY: to get at the depencencies' snapshots while preparing the PR1446 branch */
     ),
 
     printDependencyClasspath := {
@@ -280,10 +285,10 @@ object ScaldingBuild extends Build {
   lazy val scaldingDate = module("date")
 
   lazy val cascadingVersion =
-    System.getenv.asScala.getOrElse("SCALDING_CASCADING_VERSION", "2.6.1")
+    System.getenv.asScala.getOrElse("SCALDING_CASCADING_VERSION", "3.0.3")
 
   lazy val cascadingJDBCVersion =
-    System.getenv.asScala.getOrElse("SCALDING_CASCADING_JDBC_VERSION", "2.6.0")
+    System.getenv.asScala.getOrElse("SCALDING_CASCADING_JDBC_VERSION", "3.0.0-wip-120")
 
   lazy val scaldingBenchmarks = module("benchmarks").settings(
     libraryDependencies ++= Seq(
@@ -319,15 +324,16 @@ object ScaldingBuild extends Build {
 
   lazy val scaldingCommons = module("commons").settings(
     libraryDependencies ++= Seq(
-      "com.backtype" % "dfs-datastores-cascading" % dfsDatastoresVersion,
-      "com.backtype" % "dfs-datastores" % dfsDatastoresVersion,
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided",
+      "temp.cchepelov.com.backtype" % "dfs-datastores-cascading3" % dfsDatastoresVersion, // FIXME: https://github.com/nathanmarz/dfs-datastores/pull/53
+      "temp.cchepelov.com.backtype" % "dfs-datastores" % dfsDatastoresVersion,
       // TODO: split into scalding-protobuf
       "com.google.protobuf" % "protobuf-java" % protobufVersion,
       "com.twitter" %% "bijection-core" % bijectionVersion,
       "com.twitter" %% "algebird-core" % algebirdVersion,
       "com.twitter" %% "chill" % chillVersion,
-      "com.twitter.elephantbird" % "elephant-bird-cascading2" % elephantbirdVersion,
-      "com.twitter.elephantbird" % "elephant-bird-core" % elephantbirdVersion,
+      "temp.cchepelov.com.twitter.elephantbird" % "elephant-bird-cascading3" % elephantbirdVersion,
+      "temp.cchepelov.com.twitter.elephantbird" % "elephant-bird-core" % elephantbirdVersion,
       "com.hadoop.gplcompression" % "hadoop-lzo" % hadoopLzoVersion,
       // TODO: split this out into scalding-thrift
       "org.apache.thrift" % "libthrift" % thriftVersion,
@@ -340,7 +346,7 @@ object ScaldingBuild extends Build {
 
   lazy val scaldingAvro = module("avro").settings(
     libraryDependencies ++= Seq(
-      "cascading.avro" % "avro-scheme" % cascadingAvroVersion,
+      "temp.cchepelov.cascading.avro" % "avro-scheme" % cascadingAvroVersion,
       "org.apache.avro" % "avro" % avroVersion,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided"
@@ -350,7 +356,9 @@ object ScaldingBuild extends Build {
   lazy val scaldingParquet = module("parquet").settings(
     libraryDependencies <++= (scalaVersion) { scalaVersion => Seq(
       // see https://issues.apache.org/jira/browse/PARQUET-143 for exclusions
-      "org.apache.parquet" % "parquet-cascading" % parquetVersion
+      "org.apache.parquet" % "parquet-cascading3" % parquetVersion // FIXME: https://github.com/apache/parquet-mr/pull/284
+        exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-pig")
+        exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-core")
         exclude("org.apache.parquet", "parquet-pig")
         exclude("com.twitter.elephantbird", "elephant-bird-pig")
         exclude("com.twitter.elephantbird", "elephant-bird-core"),
@@ -395,12 +403,19 @@ object ScaldingBuild extends Build {
     .settings(
       libraryDependencies ++= Seq(
         // see https://issues.apache.org/jira/browse/PARQUET-143 for exclusions
-        "org.apache.parquet" % "parquet-cascading" % parquetVersion
+        "org.apache.parquet" % "parquet-cascading3" % parquetVersion
+          exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-pig")
+          exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-core")
           exclude("org.apache.parquet", "parquet-pig")
           exclude("com.twitter.elephantbird", "elephant-bird-pig")
           exclude("com.twitter.elephantbird", "elephant-bird-core"),
          "org.slf4j" % "slf4j-api" % slf4jVersion,
-        "org.apache.parquet" % "parquet-thrift" % parquetVersion % "test" classifier "tests",
+        "org.apache.parquet" % "parquet-thrift" % parquetVersion % "test" classifier "tests"
+          exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-pig")
+          exclude("temp.cchepelov.com.twitter.elephantbird", "elephant-bird-core")
+          exclude("org.apache.parquet", "parquet-pig")
+          exclude("com.twitter.elephantbird", "elephant-bird-pig")
+          exclude("com.twitter.elephantbird", "elephant-bird-core"),
          "com.twitter" %% "scrooge-serializer" % scroogeVersion,
         "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided",
         "com.novocode" % "junit-interface" % "0.11" % "test",
@@ -483,7 +498,7 @@ object ScaldingBuild extends Build {
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "provided",
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion,
       "org.json4s" %% "json4s-native" % json4SVersion,
-      "com.twitter.elephantbird" % "elephant-bird-cascading2" % elephantbirdVersion % "provided"
+      "temp.cchepelov.com.twitter.elephantbird" % "elephant-bird-cascading3" % elephantbirdVersion % "provided"
       )
     }
   ).dependsOn(scaldingCore)
