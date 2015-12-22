@@ -25,7 +25,7 @@ object ScaldingBuild extends Build {
   val avroVersion = "1.7.4"
   val bijectionVersion = "0.8.1"
   val cascadingAvroVersion = "3.0-SNAPSHOT"    // https://github.com/ScaleUnlimited/cascading.avro/pull/44
-  val chillVersion = "0.7.1"
+  val chillVersion = "0.7.3-SNAPSHOT"
   val dfsDatastoresVersion = "1.3.8-SNAPSHOT"  // https://github.com/nathanmarz/dfs-datastores/pull/53
   val elephantbirdVersion = "4.11-SNAPSHOT"    // https://github.com/twitter/elephant-bird/pull/454
   val hadoopLzoVersion = "0.4.19"
@@ -214,16 +214,16 @@ object ScaldingBuild extends Build {
     scaldingCore,
     scaldingCommons,
     scaldingAvro,
-    scaldingParquet,
-    scaldingParquetScrooge,
-    scaldingHRaven,
-    scaldingRepl,
+//    scaldingParquet,
+//    scaldingParquetScrooge,
+//    scaldingHRaven,
+//    scaldingRepl,
     scaldingJson,
     scaldingJdbc,
     scaldingHadoopTest,
     scaldingDb,
-    maple,
-    executionTutorial,
+//    maple,
+//    executionTutorial,
     scaldingSerialization,
     scaldingThriftMacros
   )
@@ -285,10 +285,10 @@ object ScaldingBuild extends Build {
   lazy val scaldingDate = module("date")
 
   lazy val cascadingVersion =
-    System.getenv.asScala.getOrElse("SCALDING_CASCADING_VERSION", "3.0.3")
+    System.getenv.asScala.getOrElse("SCALDING_CASCADING_VERSION", "3.1.0-wip-42")
 
   lazy val cascadingJDBCVersion =
-    System.getenv.asScala.getOrElse("SCALDING_CASCADING_JDBC_VERSION", "3.0.0-wip-120")
+    System.getenv.asScala.getOrElse("SCALDING_CASCADING_JDBC_VERSION", "3.0.0-wip-123")
 
   lazy val scaldingBenchmarks = module("benchmarks").settings(
     libraryDependencies ++= Seq(
