@@ -75,6 +75,9 @@ object Mode {
   val DefaultHadoop2TezFlowConnector = "cascading.flow.tez.Hadoop2TezFlowConnector"
   val DefaultHadoop2TezFlowProcess = "cascading.flow.tez.Hadoop2TezFlowProcess"
 
+  val DefaultHadoop2FlinkFlowConnector = "com.dataartisans.flink.cascading.FlinkConnector"
+  val DefaultHadoop2FlinkFlowProcess = "com.dataartisans.flink.cascading.runtime.util.FlinkFlowProcess"
+
   // This should be passed ALL the args supplied after the job name
   def apply(args: Args, config: Configuration): Mode = {
     val strictSources = args.boolean("tool.partialok") == false
@@ -99,8 +102,12 @@ object Mode {
       config.set(CascadingFlowConnectorClassKey, DefaultHadoop2TezFlowConnector)
       config.set(CascadingFlowProcessClassKey, DefaultHadoop2TezFlowProcess)
       Hdfs(strictSources, config)
+    } else if (args.boolean("hadoop2-flink")) {
+      config.set(CascadingFlowConnectorClassKey, DefaultHadoop2FlinkFlowConnector)
+      config.set(CascadingFlowProcessClassKey, DefaultHadoop2FlinkFlowProcess)
+      Hdfs(strictSources, config)
     } else
-      throw ArgsException("[ERROR] Mode must be one of --local, --hadoop1, --hadoop2-mr1, --hadoop2-tez or --hdfs, you provided none")
+      throw ArgsException("[ERROR] Mode must be one of --local, --hadoop1, --hadoop2-mr1, --hadoop2-tez, --hadoop2-flink or --hdfs, you provided none")
   }
 }
 
