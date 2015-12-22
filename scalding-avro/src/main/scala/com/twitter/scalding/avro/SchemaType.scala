@@ -20,7 +20,6 @@ import org.apache.avro.specific.SpecificRecord
 
 import java.nio.ByteBuffer
 
-
 trait AvroSchemaType[T] extends Serializable {
   def schema: Schema
 }
@@ -73,7 +72,7 @@ object AvroSchemaType {
 
   // Avro SpecificRecord
   implicit def SpecificRecordSchema[T <: SpecificRecord](implicit mf: Manifest[T]) = new AvroSchemaType[T] {
-    def schema = mf.erasure.newInstance.asInstanceOf[SpecificRecord].getSchema
+    def schema = mf.runtimeClass.newInstance.asInstanceOf[SpecificRecord].getSchema
   }
 
 }

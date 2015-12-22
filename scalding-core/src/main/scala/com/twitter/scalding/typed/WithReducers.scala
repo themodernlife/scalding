@@ -15,11 +15,20 @@ limitations under the License.
 */
 package com.twitter.scalding.typed
 
-/** used for types that may know how many reducers they need
+/**
+ * used for types that may know how many reducers they need
  * e.g. CoGrouped, Grouped, SortedGrouped, UnsortedGrouped
  */
 trait HasReducers {
   def reducers: Option[Int]
+}
+
+/**
+ * used for types that must know how many reducers they need
+ * e.g. Sketched
+ */
+trait MustHaveReducers extends HasReducers {
+  def reducers: Some[Int]
 }
 
 /**

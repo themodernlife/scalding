@@ -18,16 +18,14 @@ package com.twitter.scalding.commons.source
 
 import com.google.protobuf.Message
 import com.twitter.scalding._
-import com.twitter.scalding.Dsl._
-import java.io.Serializable
 import org.apache.thrift.TBase
 
 abstract class FixedPathLzoThrift[T <: TBase[_, _]: Manifest](path: String*)
   extends FixedPathSource(path: _*) with LzoThrift[T] {
-  def column = manifest[T].erasure
+  def column = manifest[T].runtimeClass
 }
 
 abstract class FixedPathLzoProtobuf[T <: Message: Manifest](path: String)
   extends FixedPathSource(path) with LzoProtobuf[T] {
-  def column = manifest[T].erasure
+  def column = manifest[T].runtimeClass
 }

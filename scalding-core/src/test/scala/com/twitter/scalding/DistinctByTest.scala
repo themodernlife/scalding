@@ -17,11 +17,8 @@ package com.twitter.scalding
 
 import com.twitter.scalding.typed.CoGrouped.distinctBy
 
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Properties
 import org.scalacheck.Prop.forAll
-import org.scalacheck.Gen._
 
 object DistinctByProps extends Properties("CoGrouped.DistinctBy") {
 
@@ -47,7 +44,7 @@ object DistinctByProps extends Properties("CoGrouped.DistinctBy") {
     val dlist = distinctBy(l)(fn)
     var seen = Set[Byte]()
     l.flatMap { it =>
-      if(seen(fn(it))) Nil
+      if (seen(fn(it))) Nil
       else {
         seen += fn(it)
         List(it)

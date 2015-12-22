@@ -4,7 +4,7 @@ Scalding is a Scala library that makes it easy to specify Hadoop MapReduce jobs.
 
 ![Scalding Logo](https://raw.github.com/twitter/scalding/develop/logo/scalding.png)
 
-Current version: `0.9.0rc4`
+Current version: `0.15.0`
 
 ## Word Count
 
@@ -15,14 +15,15 @@ package com.twitter.scalding.examples
 
 import com.twitter.scalding._
 
-class WordCountJob(args : Args) extends Job(args) {
-  TextLine( args("input") )
-    .flatMap('line -> 'word) { line : String => tokenize(line) }
-    .groupBy('word) { _.size }
-    .write( Tsv( args("output") ) )
+class WordCountJob(args: Args) extends Job(args) {
+  TypedPipe.from(TextLine(args("input")))
+    .flatMap { line => tokenize(line) }
+    .groupBy { word => word } // use each word for a key
+    .size // in each group, get the size
+    .write(TypedTsv[(String, Long)](args("output")))
 
   // Split a piece of text into individual words.
-  def tokenize(text : String) : Array[String] = {
+  def tokenize(text: String): Array[String] = {
     // Lowercase each word and remove punctuation.
     text.toLowerCase.replaceAll("[^a-zA-Z0-9\\s]", "").split("\\s+")
   }
@@ -36,16 +37,22 @@ You can find more example code under [examples/](https://github.com/twitter/scal
 ## Documentation and Getting Started
 
 * [**Getting Started**](https://github.com/twitter/scalding/wiki/Getting-Started) page on the [Scalding Wiki](https://github.com/twitter/scalding/wiki)
+* [Scalding Scaladocs](http://twitter.github.com/scalding) provide details beyond the API References. Prefer using this as it's always up to date.
+* [**REPL in Wonderland**](https://gist.github.com/johnynek/a47699caa62f4f38a3e2) a hands-on tour of the
+  scalding REPL requiring only git and java installed.
 * [**Runnable tutorials**](https://github.com/twitter/scalding/tree/master/tutorial) in the source.
 * The API Reference, including many example Scalding snippets:
-  * [Fields-based API Reference](https://github.com/twitter/scalding/wiki/Fields-based-API-Reference)
   * [Type-safe API Reference](https://github.com/twitter/scalding/wiki/Type-safe-api-reference)
-* [Scalding Scaladocs](http://twitter.github.com/scalding) provide details beyond the API References
+  * [Fields-based API Reference](https://github.com/twitter/scalding/wiki/Fields-based-API-Reference)
 * The Matrix Library provides a way of working with key-attribute-value scalding pipes:
   * The [Introduction to Matrix Library](https://github.com/twitter/scalding/wiki/Introduction-to-Matrix-Library) contains an overview and a "getting started" example
   * The [Matrix API Reference](https://github.com/twitter/scalding/wiki/Matrix-API-Reference) contains the Matrix Library API reference with examples
+* [**Introduction to Scalding Execution**](https://github.com/twitter/scalding/wiki/Calling-Scalding-from-inside-your-application) contains general rules and examples of calling Scalding from inside another application.
 
 Please feel free to use the beautiful [Scalding logo](https://drive.google.com/folderview?id=0B3i3pDi3yVgNbm9pMUdDcHFKVEk&usp=sharing) artwork anywhere.
+
+## Code of Conduct
+This, and all github.com/twitter projects, are under the [Twitter Open Source Code of Conduct](https://engineering.twitter.com/opensource/code-of-conduct). Additionally, see the [Typelevel Code of Conduct](http://typelevel.org/conduct) for specific examples of harassing behavior that are not tolerated.
 
 ## Building
 There is a script (called sbt) in the root that loads the correct sbt version to build:
@@ -61,24 +68,24 @@ The test suite takes a while to run. When you're in sbt, here's a shortcut to ru
 Please refer to [FAQ page](https://github.com/twitter/scalding/wiki/Frequently-asked-questions#issues-with-sbt) if you encounter problems when using sbt.
 
 We use [Travis CI](http://travis-ci.org/) to verify the build:
-[![Build Status](https://secure.travis-ci.org/twitter/scalding.png)](http://travis-ci.org/twitter/scalding)
+[![Build Status](https://travis-ci.org/twitter/scalding.svg?branch=develop)](http://travis-ci.org/twitter/scalding)
+
+We use [Coveralls](https://coveralls.io/r/twitter/scalding) for code coverage results:
+[![Coverage Status](https://coveralls.io/repos/twitter/scalding/badge.png?branch=develop)](https://coveralls.io/r/twitter/scalding?branch=develop)
 
 Scalding modules are available from maven central.
 
-The current groupid and version for all modules is, respectively, `"com.twitter"` and  `0.8.11`.
+The current groupid and version for all modules is, respectively, `"com.twitter"` and  `0.12.0`.
 
 Current published artifacts are
 
-* `scalding-core_2.9.2`
 * `scalding-core_2.10`
-* `scalding-args_2.9.2`
 * `scalding-args_2.10`
-* `scalding-date_2.9.2`
 * `scalding-date_2.10`
-* `scalding-commons_2.9.2`
 * `scalding-commons_2.10`
-* `scalding-avro_2.9.2`
 * `scalding-avro_2.10`
+* `scalding-parquet_2.10`
+* `scalding-repl_2.10`
 
 
 The suffix denotes the scala version.
@@ -118,6 +125,10 @@ Thanks for assistance and contributions:
 
 * Sam Ritchie <http://twitter.com/sritchie>
 * Aaron Siegel: <http://twitter.com/asiegel>
+* Ian O'Connell <http://twitter.com/0x138>
+* Alex Levenson <http://twitter.com/THISWILLWORK>
+* Jonathan Coveney <http://twitter.com/jco>
+* Kevin Lin <http://twitter.com/reconditesea>
 * Brad Greenlee: <http://twitter.com/bgreenlee>
 * Edwin Chen <http://twitter.com/edchedch>
 * Arkajit Dey: <http://twitter.com/arkajit>
@@ -127,9 +138,9 @@ Thanks for assistance and contributions:
 * Ning Liang <http://twitter.com/ningliang>
 * Dmitriy Ryaboy <http://twitter.com/squarecog>
 * Dong Wang <http://twitter.com/dongwang218>
-* Kevin Lin <http://twitter.com/reconditesea>
 * Josh Attenberg <http://twitter.com/jattenberg>
-* Juliet Hougland <https://twitter.com/JulietHougland>
+* Juliet Hougland <https://twitter.com/j_houg>
+* Eddie Xie <https://twitter.com/eddiex>
 
 A full list of [contributors](https://github.com/twitter/scalding/graphs/contributors) can be found on GitHub.
 

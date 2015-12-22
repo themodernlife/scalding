@@ -20,12 +20,14 @@ import cascading.pipe.Pipe
 import cascading.scheme.Scheme
 import cascading.scheme.hadoop.WritableSequenceFile
 import cascading.tuple.Fields
-import com.twitter.bijection.{Bijection, Injection}
+import com.twitter.bijection.{ Bijection, Injection }
 import com.twitter.chill.Externalizer
 import com.twitter.scalding._
 
 import java.util.Arrays
 import org.apache.hadoop.io.BytesWritable
+import scala.annotation.meta.param
+import scala.collection.JavaConverters._
 
 /**
  * Source used to write some type T into a WritableSequenceFile using a codec on T
@@ -45,17 +47,19 @@ object CodecSource {
   def apply[T](paths: String*)(implicit codec: Injection[T, Array[Byte]]) = new CodecSource[T](paths)
 }
 
-class CodecSource[T] private (val hdfsPaths: Seq[String], val maxFailures: Int = 0)(implicit @transient injection: Injection[T, Array[Byte]])
-extends FileSource
-with Mappable[T] {
+class CodecSource[T] private (val hdfsPaths: Seq[String], val maxFailures: Int = 0)(implicit @(transient @param) injection: Injection[T, Array[Byte]])
+  extends FileSource
+  with Mappable[T]
+  with LocalTapSource {
   import Dsl._
 
   val fieldSym = 'encodedBytes
   lazy val field = new Fields(fieldSym.name)
   val injectionBox = Externalizer(injection andThen BytesWritableCodec.get)
 
+  def localPaths = hdfsPaths
+
   override def converter[U >: T] = TupleConverter.asSuperConverter[T, U](TupleConverter.singleConverter[T])
-  override def localPath = sys.error("Local mode not yet supported.")
   override def hdfsScheme =
     HadoopSchemeInstance(new WritableSequenceFile(field, classOf[BytesWritable]).asInstanceOf[Scheme[_, _, _, _, _]])
 
@@ -65,4 +69,13 @@ with Mappable[T] {
 
   override def transformForWrite(pipe: Pipe) =
     pipe.mapTo((0) -> (fieldSym)) { injectionBox.get.apply(_: T) }
+
+  override def toIterator(implicit config: Config, mode: Mode): Iterator[T] = {
+    val tap = createTap(Read)(mode)
+    mode.openForRead(config, tap)
+      .asScala
+      .flatMap { te =>
+        checkedInversion(te.selectTuple(sourceFields).getObject(0).asInstanceOf[BytesWritable])
+      }
+  }
 }

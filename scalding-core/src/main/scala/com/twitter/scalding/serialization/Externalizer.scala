@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 package com.twitter.scalding.serialization
-import com.twitter.chill.{ Externalizer => ChillExtern}
+
+import com.twitter.chill.{ Externalizer => ChillExtern }
 
 import com.esotericsoftware.kryo.DefaultSerializer
 import com.esotericsoftware.kryo.serializers.JavaSerializer
 
-import com.twitter.chill.config.ScalaMapConfig
+import com.twitter.chill.config.ScalaAnyRefMapConfig
+
 /**
  * We need to control the Kryo created
  */
@@ -34,7 +36,6 @@ object Externalizer {
 @DefaultSerializer(classOf[JavaSerializer])
 class Externalizer[T] extends ChillExtern[T] {
   protected override def kryo =
-    new KryoHadoop(ScalaMapConfig(Map("scalding.kryo.setreferences" -> "true")))
+    new KryoHadoop(ScalaAnyRefMapConfig(Map("scalding.kryo.setreferences" -> "true")))
 }
-
 

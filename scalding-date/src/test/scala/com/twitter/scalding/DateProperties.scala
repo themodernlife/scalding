@@ -21,7 +21,6 @@ import org.scalacheck.Prop.forAll
 import org.scalacheck.Gen.choose
 import org.scalacheck.Prop._
 
-import scala.util.control.Exception.allCatch
 import AbsoluteDuration.fromMillisecs
 
 object DateProperties extends Properties("Date Properties") {
@@ -32,11 +31,13 @@ object DateProperties extends Properties("Date Properties") {
     Arbitrary { choose(0, 10000).map { Millisecs(_) } }
 
   implicit val richDateArb: Arbitrary[RichDate] = Arbitrary {
-    for(v <- choose(0L, 1L<<32)) yield RichDate(v)
+    for (v <- choose(0L, 1L << 32)) yield RichDate(v)
   }
   implicit val dateRangeArb: Arbitrary[DateRange] = Arbitrary {
-    for(v1 <- choose(0L, 1L<<33);
-        v2 <- choose(v1, 1L<<33)) yield DateRange(RichDate(v1), RichDate(v2))
+    for (
+      v1 <- choose(0L, 1L << 33);
+      v2 <- choose(v1, 1L << 33)
+    ) yield DateRange(RichDate(v1), RichDate(v2))
   }
   implicit val absdur: Arbitrary[AbsoluteDuration] =
     Arbitrary {
@@ -45,7 +46,7 @@ object DateProperties extends Properties("Date Properties") {
         // Ignore Longs that are too big to fit, and make sure we can add any random 3 together
         // Long.MaxValue / 1200 ms is the biggest that will fit, we divide by 3 to make sure
         // we can add three together in tests
-        .map { ms => fromMillisecs(ms/(1200*3)) }
+        .map { ms => fromMillisecs(ms / (1200 * 3)) }
     }
 
   property("Shifting DateRanges breaks containment") = forAll { (dr: DateRange, r: Duration) =>
@@ -62,7 +63,7 @@ object DateProperties extends Properties("Date Properties") {
     (fromMillisecs(ms) == ad)
   }
 
-  def asInt(b: Boolean) = if(b) 1 else 0
+  def asInt(b: Boolean) = if (b) 1 else 0
 
   property("Before/After works") = forAll { (dr: DateRange, rd: RichDate) =>
     (asInt(dr.contains(rd)) + asInt(dr.isBefore(rd)) + asInt(dr.isAfter(rd)) == 1) &&
@@ -70,7 +71,7 @@ object DateProperties extends Properties("Date Properties") {
       (dr.isAfter(dr.start - (dr.end - dr.start)))
   }
 
-  def divDur(ad: AbsoluteDuration, div: Int) = fromMillisecs(ad.toMillisecs/div)
+  def divDur(ad: AbsoluteDuration, div: Int) = fromMillisecs(ad.toMillisecs / div)
 
   property("each output is contained") = forAll { (dr: DateRange) =>
     val r = divDur(dr.end - dr.start, 10)
@@ -94,23 +95,35 @@ object DateProperties extends Properties("Date Properties") {
   property("AbsoluteDuration group properties") =
     forAll { (a: AbsoluteDuration, b: AbsoluteDuration, c: AbsoluteDuration) =>
       (a + b) - c == a + (b - c) &&
-      (a + b) + c == a + (b + c) &&
-      (a - a) == fromMillisecs(0) &&
-      (b - b) == fromMillisecs(0) &&
-      (c - c) == fromMillisecs(0) &&
-      { b.toMillisecs == 0 || {
-          // Don't divide by zero:
-          val (d, rem) = (a/b)
-          a == b * d + rem && (rem.toMillisecs.abs < b.toMillisecs.abs)
+        (a + b) + c == a + (b + c) &&
+        (a - a) == fromMillisecs(0) &&
+        (b - b) == fromMillisecs(0) &&
+        (c - c) == fromMillisecs(0) &&
+        {
+          b.toMillisecs == 0 || {
+            // Don't divide by zero:
+            val (d, rem) = (a / b)
+            a == b * d + rem && (rem.toMillisecs.abs < b.toMillisecs.abs)
+          }
         }
-      }
     }
 
   property("DateRange.length is correct") = forAll { (dr: DateRange) =>
     dr.start + dr.length - AbsoluteDuration.fromMillisecs(1L) == dr.end
   }
 
-  def toRegex(glob: String) = (glob.flatMap { c => if(c == '*') ".*" else c.toString }).r
+  property("DateRange.exclusiveUpper works") = forAll { (a: RichDate, b: RichDate) =>
+    val lower = Ordering[RichDate].min(a, b)
+    val upper = Ordering[RichDate].max(a, b)
+    val ex = DateRange.exclusiveUpper(lower, upper)
+    val in = DateRange(lower, upper)
+    val upperPred = upper - Millisecs(1)
+
+    (false == ex.contains(upper)) &&
+      (ex.contains(upperPred) || (lower == upper))
+  }
+
+  def toRegex(glob: String) = (glob.flatMap { c => if (c == '*') ".*" else c.toString }).r
 
   def matches(l: List[String], arg: String): Int = l
     .map { toRegex _ }

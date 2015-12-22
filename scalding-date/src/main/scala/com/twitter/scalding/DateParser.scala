@@ -17,7 +17,7 @@ limitations under the License.
 
 package com.twitter.scalding
 
-import scala.util.{Try, Failure}
+import scala.util.{ Try, Failure }
 import java.util.TimeZone
 import java.text.DateFormat
 
@@ -38,10 +38,14 @@ trait DateParser extends java.io.Serializable { self =>
 }
 
 object DateParser {
-  /** This is scalding's default date parser. You can choose this
+  /**
+   * This is scalding's default date parser. You can choose this
    * by setting an implicit val DateParser.
+   * Note that DateParsers using SimpleDateFormat from Java are
+   * not thread-safe, thus the def here. You can cache the result
+   * if you are sure
    */
-  val default: DateParser = new DateParser {
+  def default: DateParser = new DateParser {
     def parse(s: String)(implicit tz: TimeZone) =
       DateOps.getDateParser(s)
         .map { p => p.parse(s) }
@@ -55,6 +59,10 @@ object DateParser {
   /** Using the type-class pattern */
   def parse(s: String)(implicit tz: TimeZone, p: DateParser): Try[RichDate] = p.parse(s)(tz)
 
+  /**
+   * Note that DateFormats in Java are generally not thread-safe,
+   * so you should not share the result here across threads
+   */
   implicit def from(df: DateFormat): DateParser = new DateParser {
     def parse(s: String)(implicit tz: TimeZone) = Try {
       df.setTimeZone(tz)
@@ -62,6 +70,9 @@ object DateParser {
     }
   }
 
+  /**
+   * This ignores the time-zone assuming it must be in the String
+   */
   def from(fn: String => RichDate) = new DateParser {
     def parse(s: String)(implicit tz: TimeZone) = Try(fn(s))
   }
@@ -71,22 +82,22 @@ object DateParser {
 }
 
 /**
- //Scalding used to support Natty, this is removed. To add it back, use something like this in your code,
- //possibly with:
- //implicit val myParser = DateParser(Seq(DateParser.default, NattyParser))
-
-object NattyParser extends DateParser {
-  def parse(s: String)(implicit tz: TimeZone) = Try {
-    val timeParser = new natty.Parser(tz)
-    val dateGroups = timeParser.parse(s)
-    if (dateGroups.size == 0) {
-      throw new IllegalArgumentException("Could not convert string: '" + str + "' into a date.")
-    }
-    // a DateGroup can have more than one Date (e.g. if you do "Sept. 11th or 12th"),
-    // but we're just going to take the first
-    val dates = dateGroups.get(0).getDates()
-    RichDate(dates.get(0))
-  }
-}
-
-*/
+ * //Scalding used to support Natty, this is removed. To add it back, use something like this in your code,
+ * //possibly with:
+ * //implicit val myParser = DateParser(Seq(DateParser.default, NattyParser))
+ *
+ * object NattyParser extends DateParser {
+ * def parse(s: String)(implicit tz: TimeZone) = Try {
+ * val timeParser = new natty.Parser(tz)
+ * val dateGroups = timeParser.parse(s)
+ * if (dateGroups.size == 0) {
+ * throw new IllegalArgumentException("Could not convert string: '" + str + "' into a date.")
+ * }
+ * // a DateGroup can have more than one Date (e.g. if you do "Sept. 11th or 12th"),
+ * // but we're just going to take the first
+ * val dates = dateGroups.get(0).getDates()
+ * RichDate(dates.get(0))
+ * }
+ * }
+ *
+ */

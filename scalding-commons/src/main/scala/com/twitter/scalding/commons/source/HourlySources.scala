@@ -21,13 +21,12 @@ import com.google.protobuf.Message
 import com.twitter.bijection.Injection
 import com.twitter.chill.Externalizer
 import com.twitter.scalding._
-import com.twitter.scalding.Dsl._
 import com.twitter.scalding.source._
-import java.io.Serializable
 import org.apache.thrift.TBase
 
-abstract class HourlySuffixLzoCodec[T](prefix: String, dateRange: DateRange)
-(implicit @transient suppliedInjection: Injection[T,Array[Byte]])
+import scala.annotation.meta.param
+
+abstract class HourlySuffixLzoCodec[T](prefix: String, dateRange: DateRange)(implicit @(transient @param) suppliedInjection: Injection[T, Array[Byte]])
   extends HourlySuffixSource(prefix, dateRange) with LzoCodec[T] {
   val boxed = Externalizer(suppliedInjection)
   override lazy val injection = boxed.get
@@ -40,12 +39,12 @@ case class HourlySuffixLzoTsv(prefix: String, fs: Fields = Fields.ALL)(override 
 
 abstract class HourlySuffixLzoThrift[T <: TBase[_, _]: Manifest](prefix: String, dateRange: DateRange)
   extends HourlySuffixSource(prefix, dateRange) with LzoThrift[T] {
-  override def column = manifest[T].erasure
+  override def column = manifest[T].runtimeClass
 }
 
 abstract class HourlySuffixLzoProtobuf[T <: Message: Manifest](prefix: String, dateRange: DateRange)
   extends HourlySuffixSource(prefix, dateRange) with LzoProtobuf[T] {
-  override def column = manifest[T].erasure
+  override def column = manifest[T].runtimeClass
 }
 
 abstract class HourlySuffixLzoText(prefix: String, dateRange: DateRange)

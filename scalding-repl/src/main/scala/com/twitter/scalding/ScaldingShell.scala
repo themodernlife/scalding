@@ -20,22 +20,36 @@ import java.io.FileOutputStream
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 
-import scala.tools.nsc.{Settings, GenericRunnerCommand, MainGenericRunner}
+import org.apache.hadoop.util.GenericOptionsParser
+import org.apache.hadoop.conf.Configuration
+
+import scala.tools.nsc.{ GenericRunnerCommand, MainGenericRunner }
 import scala.tools.nsc.interpreter.ILoop
 import scala.tools.nsc.io.VirtualDirectory
 
 import com.google.common.io.Files
 
+case class ShellArgs(cfg: Config, mode: Mode, cmdArgs: List[String])
+
 /**
  * A runner for a Scala REPL providing functionality extensions specific to working with
  * Scalding.
  */
-object ScaldingShell extends MainGenericRunner {
+trait BaseScaldingShell extends MainGenericRunner {
 
   /**
    * An instance of the Scala REPL the user will interact with.
    */
   private var scaldingREPL: Option[ILoop] = None
+
+  /**
+   * An instance of the default configuration for the REPL
+   */
+  private val conf: Configuration = new Configuration()
+
+  protected def replState: BaseReplState = ReplState
+
+  protected def scaldingREPLProvider: () => ILoop = { () => new ScaldingILoop }
 
   /**
    * The main entry point for executing the REPL.
@@ -48,12 +62,58 @@ object ScaldingShell extends MainGenericRunner {
    * @return `true` if execution was successful, `false` otherwise.
    */
   override def process(args: Array[String]): Boolean = {
+    // Get the mode (hdfs or local), and initialize the configuration
+    val ShellArgs(cfg, mode, cmdArgs) = parseModeArgs(args)
+
     // Process command line arguments into a settings object, and use that to start the REPL.
-    val command = new GenericRunnerCommand(args.toList, (x: String) => errorFn(x))
-    command.settings.usejavacp.value = true
+    // We ignore params we don't care about - hence error function is empty
+    val command = new GenericRunnerCommand(cmdArgs, _ => ())
+
+    // inherit defaults for embedded interpretter (needed for running with SBT)
+    // (TypedPipe chosen arbitrarily, just needs to be something representative)
+    command.settings.embeddedDefaults[TypedPipe[String]]
+
+    // if running from the assembly, need to explicitly tell it to use java classpath
+    if (args.contains("--repl")) command.settings.usejavacp.value = true
+
     command.settings.classpath.append(System.getProperty("java.class.path"))
-    scaldingREPL = Some(new ScaldingILoop)
+
+    // Force the repl to be synchronous, so all cmds are executed in the same thread
+    command.settings.Yreplsync.value = true
+
+    scaldingREPL = Some(scaldingREPLProvider.apply())
+    replState.mode = mode
+    replState.customConfig = replState.customConfig ++ (mode match {
+      case _: HadoopMode => cfg
+      case _ => Config.empty
+    })
+
+    // if in Hdfs mode, store the mode to enable switching between Local and Hdfs
+    mode match {
+      case m @ Hdfs(_, _) => replState.storedHdfsMode = Some(m)
+      case _ => ()
+    }
+
     scaldingREPL.get.process(command.settings)
+  }
+
+  // This both updates the jobConf with hadoop arguments
+  // and returns all the non-hadoop arguments. Should be called once if
+  // you want to process hadoop arguments (like -libjars).
+  protected def nonHadoopArgsFrom(args: Array[String]): Array[String] =
+    (new GenericOptionsParser(conf, args)).getRemainingArgs
+
+  /**
+   * Sets the mode for this job, updates jobConf with hadoop arguments
+   * and returns all the non-hadoop arguments.
+   *
+   * @param args from the command line.
+   * @return a Mode for the job (e.g. local, hdfs), config and the non-hadoop params
+   */
+  def parseModeArgs(args: Array[String]): ShellArgs = {
+    val a = nonHadoopArgsFrom(args)
+    val mode = Mode(Args(a), conf)
+    ShellArgs(Config.defaultFrom(mode), mode, a.toList)
   }
 
   /**
@@ -78,7 +138,7 @@ object ScaldingShell extends MainGenericRunner {
       val virtualDirectory = repl.virtualDirectory
       val tempJar = new File(Files.createTempDir(),
         "scalding-repl-session-" + System.currentTimeMillis() + ".jar")
-      createJar(virtualDirectory, tempJar)
+      createJar(virtualDirectory.asInstanceOf[VirtualDirectory], tempJar)
     }
   }
 
@@ -109,9 +169,9 @@ object ScaldingShell extends MainGenericRunner {
    * @param jarStream for writing the jar file.
    */
   private def addVirtualDirectoryToJar(
-      dir: VirtualDirectory,
-      entryPath: String,
-      jarStream: JarOutputStream) {
+    dir: VirtualDirectory,
+    entryPath: String,
+    jarStream: JarOutputStream) {
     dir.foreach { file =>
       if (file.isDirectory) {
         // Recursively descend into subdirectories, adjusting the package name as we do.
@@ -130,3 +190,5 @@ object ScaldingShell extends MainGenericRunner {
     }
   }
 }
+
+object ScaldingShell extends BaseScaldingShell

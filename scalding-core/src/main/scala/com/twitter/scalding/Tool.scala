@@ -15,36 +15,35 @@ limitations under the License.
 */
 package com.twitter.scalding
 
-import org.apache.hadoop
-import cascading.tuple.Tuple
-import collection.mutable.{ListBuffer, Buffer}
-import scala.annotation.tailrec
-import scala.util.Try
-import java.io.{ BufferedWriter, File, FileOutputStream, OutputStreamWriter }
-import java.util.UUID
+import cascading.flow.hadoop.HadoopFlow
+import cascading.flow.planner.BaseFlowStep
 
-class Tool extends hadoop.conf.Configured with hadoop.util.Tool {
+import org.apache.hadoop.conf.Configured
+import org.apache.hadoop.mapred.JobConf
+import org.apache.hadoop.util.{ GenericOptionsParser, Tool => HTool, ToolRunner }
+
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+
+class Tool extends Configured with HTool {
   // This mutable state is not my favorite, but we are constrained by the Hadoop API:
-  var rootJob : Option[(Args) => Job] = None
+  var rootJob: Option[(Args) => Job] = None
 
   //  Allows you to set the job for the Tool to run
-  def setJobConstructor(jobc : (Args) => Job) {
-    if(rootJob.isDefined) {
+  def setJobConstructor(jobc: (Args) => Job) {
+    if (rootJob.isDefined) {
       sys.error("Job is already defined")
-    }
-    else {
+    } else {
       rootJob = Some(jobc)
     }
   }
 
-  protected def getJob(args : Args) : Job = {
-    if( rootJob.isDefined ) {
+  protected def getJob(args: Args): Job = {
+    if (rootJob.isDefined) {
       rootJob.get.apply(args)
-    }
-    else if(args.positional.isEmpty) {
-      sys.error("Usage: Tool <jobClass> --local|--hdfs [args...]")
-    }
-    else {
+    } else if (args.positional.isEmpty) {
+      throw ArgsException("Usage: Tool <jobClass> --local|--hdfs [args...]")
+    } else {
       val jobName = args.positional(0)
       // Remove the job name from the positional arguments:
       val nonJobNameArgs = args + ("" -> args.positional.tail)
@@ -55,34 +54,23 @@ class Tool extends hadoop.conf.Configured with hadoop.util.Tool {
   // This both updates the jobConf with hadoop arguments
   // and returns all the non-hadoop arguments. Should be called once if
   // you want to process hadoop arguments (like -libjars).
-  protected def nonHadoopArgsFrom(args : Array[String]) : Array[String] = {
-    (new hadoop.util.GenericOptionsParser(getConf, args)).getRemainingArgs
+  protected def nonHadoopArgsFrom(args: Array[String]): Array[String] = {
+    (new GenericOptionsParser(getConf, args)).getRemainingArgs
   }
 
-  def parseModeArgs(args : Array[String]) : (Mode, Args) = {
+  def parseModeArgs(args: Array[String]): (Mode, Args) = {
     val a = Args(nonHadoopArgsFrom(args))
     (Mode(a, getConf), a)
   }
 
-  def toJsonValue(a: Any): String = {
-    Try(a.toString.toInt)
-      .recoverWith { case t: Throwable => Try(a.toString.toDouble) }
-      .recover { case t: Throwable =>
-          val s = a.toString
-          "\"%s\"".format(s)
-      }
-      .get
-      .toString
-  }
-
   // Parse the hadoop args, and if job has not been set, instantiate the job
-  def run(args : Array[String]) : Int = {
+  def run(args: Array[String]): Int = {
     val (mode, jobArgs) = parseModeArgs(args)
     // Connect mode with job Args
     run(getJob(Mode.putMode(mode, jobArgs)))
   }
 
-  protected def run(job : Job) : Int = {
+  protected def run(job: Job): Int = {
 
     val onlyPrintGraph = job.args.boolean("tool.graph")
     if (onlyPrintGraph) {
@@ -96,7 +84,7 @@ class Tool extends hadoop.conf.Configured with hadoop.util.Tool {
     */
     val jobName = job.getClass.getName
     @tailrec
-    def start(j : Job, cnt : Int) {
+    def start(j: Job, cnt: Int) {
       val successful = if (onlyPrintGraph) {
         val flow = j.buildFlow
         /*
@@ -107,52 +95,47 @@ class Tool extends hadoop.conf.Configured with hadoop.util.Tool {
         */
         val thisDot = jobName + cnt + ".dot"
         println("writing DOT: " + thisDot)
+
+        /* We add descriptions if they exist to the stepName so it appears in the .dot file */
+        flow match {
+          case hadoopFlow: HadoopFlow =>
+            val flowSteps = hadoopFlow.getFlowSteps.asScala
+            flowSteps.foreach(step => {
+              val baseFlowStep: BaseFlowStep[JobConf] = step.asInstanceOf[BaseFlowStep[JobConf]]
+              val descriptions = baseFlowStep.getConfig.get(Config.StepDescriptions, "")
+              if (!descriptions.isEmpty) {
+                val stepXofYData = """\(\d+/\d+\)""".r.findFirstIn(baseFlowStep.getName).getOrElse("")
+                // Reflection is only temporary.  Latest cascading has setName public: https://github.com/cwensel/cascading/commit/487a6e9ef#diff-0feab84bc8832b2a39312dbd208e3e69L175
+                // https://github.com/twitter/scalding/issues/1294
+                val x = classOf[BaseFlowStep[JobConf]].getDeclaredMethod("setName", classOf[String])
+                x.setAccessible(true)
+                x.invoke(step, "%s %s".format(stepXofYData, descriptions))
+              }
+            })
+          case _ => // descriptions not yet supported in other modes
+        }
+
         flow.writeDOT(thisDot)
 
         val thisStepsDot = jobName + cnt + "_steps.dot"
         println("writing Steps DOT: " + thisStepsDot)
         flow.writeStepsDOT(thisStepsDot)
         true
-      }
-      else {
+      } else {
         j.validate
-        //Block while the flow is running:
-        val status = if (job.args.boolean("scalding.flowstats")) {
-          val flow = j.runFlow
-          val statsFilename = job.args.getOrElse("scalding.flowstats", jobName + cnt + "._flowstats.json")
-          val jsonStats = JobStats(flow).toMap.map { case (k, v) => "\"%s\" : %s".format(k, toJsonValue(v))}
-            .mkString("{",",","}")
-          val br = new BufferedWriter(
-            new OutputStreamWriter(new FileOutputStream(statsFilename), "utf-8"))
-          br.write(jsonStats)
-          br.close()
-          flow.getFlowStats.isSuccessful
-        } else {
-          j.run
-        }
-
-        // Print custom counters unless --scalding.nocounters is used
-        if (!job.args.boolean("scalding.nocounters")) {
-          println("Dumping custom counters:")
-          Stats.getAllCustomCounters.foreach { case (counter, value) =>
-            println("%s\t%s".format(counter, value))
-          }
-        }
-
-        status
+        j.run
       }
       j.clear
       //When we get here, the job is finished
-      if(successful) {
+      if (successful) {
         j.next match {
           case Some(nextj) => start(nextj, cnt + 1)
           case None => Unit
         }
       } else {
         throw new RuntimeException("Job failed to run: " + jobName +
-          (if(cnt > 0) { " child: " + cnt.toString + ", class: " + j.getClass.getName }
-          else { "" })
-        )
+          (if (cnt > 0) { " child: " + cnt.toString + ", class: " + j.getClass.getName }
+          else { "" }))
       }
     }
     //start a counter to see how deep we recurse:
@@ -164,21 +147,11 @@ class Tool extends hadoop.conf.Configured with hadoop.util.Tool {
 object Tool {
   def main(args: Array[String]) {
     try {
-      hadoop.util.ToolRunner.run(new hadoop.mapred.JobConf, new Tool, args)
+      ToolRunner.run(new JobConf, new Tool, args)
     } catch {
       case t: Throwable => {
-         //create the exception URL link in GitHub wiki
-         val gitHubLink = RichXHandler.createXUrl(t)
-         val extraInfo = (if(RichXHandler().handlers.exists(h => h(t))) {
-             RichXHandler.mapping(t.getClass) + "\n"
-         }
-         else {
-           ""
-         }) +
-         "If you know what exactly caused this error, please consider contributing to GitHub via following link.\n" + gitHubLink
-
-         //re-throw the exception with extra info
-         throw new Throwable(extraInfo, t)
+        //re-throw the exception with extra info
+        throw new Throwable(RichXHandler(t), t)
       }
     }
   }
